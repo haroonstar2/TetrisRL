@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  rl-app:
+    build:
+      context: ./apps/rl-app
+      dockerfile: Dockerfile
+    container_name: tetris-rl-app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: tetris-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - RL_SERVICE_URL=http://rl-app:8000
+    depends_on:
+      - rl-app
+    restart: unless-stopped
+
+  web-client:
+    build:
+      context: .
+      dockerfile: apps/web-client/Dockerfile
+      args:
+        - NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+    container_name: tetris-web-client
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+    depends_on:
+      - backend
+    restart: unless-stopped

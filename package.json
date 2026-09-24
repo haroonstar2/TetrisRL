@@ -1,0 +1,20 @@
+{
+  "name": "tetris-rl-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/web-client",
+    "apps/backend"
+  ],
+  "scripts": {
+    "test:frontend": "npm run test --workspace=apps/web-client",
+    "test:backend": "npm run test --workspace=apps/backend",
+    "test:rl": "cd apps/rl-app && pytest",
+    "test": "npm run test:frontend && npm run test:backend && npm run test:rl",
+    "build:frontend": "npm run build --workspace=apps/web-client",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build": "npm run build:frontend && npm run build:backend",
+    "dev:frontend": "npm run dev --workspace=apps/web-client",
+    "dev:backend": "npm run start:dev --workspace=apps/backend"
+  }
+}

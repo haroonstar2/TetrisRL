@@ -7,6 +7,7 @@ COPY apps/web-client/package*.json ./apps/web-client/
 COPY apps/web-client/tsconfig*.json ./apps/web-client/
 COPY apps/web-client/vitest*.ts ./apps/web-client/
 COPY apps/web-client/src ./apps/web-client/src
+COPY apps/web-client/public ./apps/web-client/public
 
 RUN npm ci --workspace=apps/web-client
 
@@ -24,7 +25,7 @@ ENV PORT=3000
 
 COPY package*.json ./
 COPY apps/web-client/package*.json ./apps/web-client/
-COPY --from=builder /app/apps/web-client/public ./apps/web-client/public 2>/dev/null || true
+COPY --from=builder /app/apps/web-client/public ./apps/web-client/public
 COPY --from=builder /app/apps/web-client/.next ./apps/web-client/.next
 
 RUN npm ci --workspace=apps/web-client --omit=dev

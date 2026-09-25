@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   createEmptyGrid,
   getRandomPiece,
@@ -14,17 +14,20 @@ import {
   BOARD_BUFFER_HEIGHT,
   COLOR_MAP,
   Piece,
-} from '../lib/tetris';
+} from "../lib/tetris";
 
 export default function TetrisGame() {
   const [grid, setGrid] = useState<number[][]>(createEmptyGrid());
   const [currentPiece, setCurrentPiece] = useState<Piece | null>(null);
+  const [nextPiece, setNextPiece] = useState<Piece | null>(null);
+  const nextPieceRef = useRef<Piece | null>(null);
+
   const [score, setScore] = useState<number>(0);
   const [lines, setLines] = useState<number>(0);
   const [gameOver, setGameOver] = useState<boolean>(false);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [mode, setMode] = useState<'user' | 'ai'>('user');
+  const [mode, setMode] = useState<"user" | "ai">("user");
   const [tickRate, setTickRate] = useState<number>(500);
 
   const gridRef = useRef(grid);
@@ -38,10 +41,15 @@ export default function TetrisGame() {
   const scoreRef = useRef(score);
   scoreRef.current = score;
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
   const spawnPiece = useCallback((currentGrid: number[][]): boolean => {
-    const newPiece = getRandomPiece();
+    const newPiece = nextPieceRef.current || getRandomPiece();
+    const upcomingPiece = getRandomPiece();
+    nextPieceRef.current = upcomingPiece;
+    setNextPiece(upcomingPiece);
+
     if (checkCollision(currentGrid, newPiece, 0, 0)) {
       setGameOver(true);
       return false;
@@ -58,26 +66,52 @@ export default function TetrisGame() {
     setGameOver(false);
     setIsPaused(false);
     setGameStarted(true);
+    nextPieceRef.current = getRandomPiece();
     spawnPiece(emptyGrid);
+
+    const restartButton = document.getElementById("start-restart-button");
+
+    setTimeout(() => {
+      restartButton?.blur();
+    }, 100);
   };
 
-  const movePiece = useCallback(
-    (dx: number, dy: number): boolean => {
-      if (!currentPieceRef.current || gameOverRef.current) return false;
-      if (!checkCollision(gridRef.current, currentPieceRef.current, dx, dy)) {
-        setCurrentPiece((prev) => (prev ? { ...prev, x: prev.x + dx, y: prev.y + dy } : null));
-        return true;
-      }
-      return false;
-    },
-    []
-  );
+  const togglePause = () => {
+    setIsPaused((prev) => !prev);
+
+    const pauseButton = document.getElementById("pause-resume-button");
+
+    setTimeout(() => {
+      pauseButton?.blur();
+    }, 10);
+  };
+
+  const movePiece = useCallback((dx: number, dy: number): boolean => {
+    if (!currentPieceRef.current || gameOverRef.current) return false;
+    if (!checkCollision(gridRef.current, currentPieceRef.current, dx, dy)) {
+      setCurrentPiece((prev) =>
+        prev ? { ...prev, x: prev.x + dx, y: prev.y + dy } : null,
+      );
+      return true;
+    }
+    return false;
+  }, []);
 
   const rotatePiece = useCallback(() => {
     if (!currentPieceRef.current || gameOverRef.current) return;
     const rotatedShape = rotateMatrix(currentPieceRef.current.shape);
-    if (!checkCollision(gridRef.current, currentPieceRef.current, 0, 0, rotatedShape)) {
-      setCurrentPiece((prev) => (prev ? { ...prev, shape: rotatedShape } : null));
+    if (
+      !checkCollision(
+        gridRef.current,
+        currentPieceRef.current,
+        0,
+        0,
+        rotatedShape,
+      )
+    ) {
+      setCurrentPiece((prev) =>
+        prev ? { ...prev, shape: rotatedShape } : null,
+      );
     }
   }, []);
 
@@ -105,10 +139,15 @@ export default function TetrisGame() {
   const hardDrop = useCallback(() => {
     if (!currentPieceRef.current || gameOverRef.current) return;
     let dy = 0;
-    while (!checkCollision(gridRef.current, currentPieceRef.current, 0, dy + 1)) {
+    while (
+      !checkCollision(gridRef.current, currentPieceRef.current, 0, dy + 1)
+    ) {
       dy++;
     }
-    const droppedPiece = { ...currentPieceRef.current, y: currentPieceRef.current.y + dy };
+    const droppedPiece = {
+      ...currentPieceRef.current,
+      y: currentPieceRef.current.y + dy,
+    };
     const merged = mergePieceToGrid(gridRef.current, droppedPiece);
     const { newGrid, linesCleared } = clearLines(merged);
     setGrid(newGrid);
@@ -122,42 +161,64 @@ export default function TetrisGame() {
   // Handle user inputs in User mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!gameStarted || gameOver || isPaused || mode !== 'user') return;
+      if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)
+      ) {
+        e.preventDefault();
+      }
+
+      if (!gameStarted || gameOver || isPaused || mode !== "user") return;
 
       switch (e.key) {
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
+        case "ArrowLeft":
+        case "a":
+        case "A":
           movePiece(-1, 0);
           break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
+        case "ArrowRight":
+        case "d":
+        case "D":
           movePiece(1, 0);
           break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
+        case "ArrowDown":
+        case "s":
+        case "S":
           dropPiece();
           break;
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
+        case "ArrowUp":
+        case "w":
+        case "W":
           rotatePiece();
           break;
-        case ' ':
+        case " ":
           hardDrop();
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameStarted, gameOver, isPaused, mode, movePiece, dropPiece, rotatePiece, hardDrop]);
+    // window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { passive: false });
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    gameStarted,
+    gameOver,
+    isPaused,
+    mode,
+    movePiece,
+    dropPiece,
+    rotatePiece,
+    hardDrop,
+  ]);
 
   // AI mode step function
   const executeAiStep = useCallback(async () => {
-    if (!gameStarted || gameOverRef.current || isPaused || modeRef.current !== 'ai') return;
+    if (
+      !gameStarted ||
+      gameOverRef.current ||
+      isPaused ||
+      modeRef.current !== "ai"
+    )
+      return;
 
     try {
       const payload = {
@@ -168,8 +229,8 @@ export default function TetrisGame() {
       };
 
       const response = await fetch(`${backendUrl}/api/game/step`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -178,16 +239,16 @@ export default function TetrisGame() {
         const action = data.action;
 
         switch (action) {
-          case 'left':
+          case "left":
             movePiece(-1, 0);
             break;
-          case 'right':
+          case "right":
             movePiece(1, 0);
             break;
-          case 'rotate':
+          case "rotate":
             rotatePiece();
             break;
-          case 'drop':
+          case "drop":
             dropPiece();
             break;
           default:
@@ -209,7 +270,7 @@ export default function TetrisGame() {
     if (!gameStarted || gameOver || isPaused) return;
 
     const interval = setInterval(() => {
-      if (mode === 'user') {
+      if (mode === "user") {
         dropPiece();
       } else {
         executeAiStep();
@@ -217,7 +278,15 @@ export default function TetrisGame() {
     }, tickRate);
 
     return () => clearInterval(interval);
-  }, [gameStarted, gameOver, isPaused, mode, tickRate, dropPiece, executeAiStep]);
+  }, [
+    gameStarted,
+    gameOver,
+    isPaused,
+    mode,
+    tickRate,
+    dropPiece,
+    executeAiStep,
+  ]);
 
   // Render combined grid (stationary blocks + active falling piece)
   const displayGrid = React.useMemo(() => {
@@ -245,56 +314,115 @@ export default function TetrisGame() {
   }, [grid, currentPiece]);
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#0f172a', color: '#f8fafc', padding: '2rem' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', textAlign: 'center', marginBottom: '1.5rem', color: '#38bdf8' }}>
+    <div
+      style={{
+        fontFamily: "system-ui, sans-serif",
+        minHeight: "100vh",
+        backgroundColor: "#0f172a",
+        color: "#f8fafc",
+        padding: "2rem",
+      }}
+    >
+      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+        <h1
+          style={{
+            fontSize: "2.5rem",
+            fontWeight: "bold",
+            textAlign: "center",
+            marginBottom: "1.5rem",
+            color: "#38bdf8",
+          }}
+        >
           Tetris RL Sandbox
         </h1>
 
         {/* Control Bar */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.5rem' }}>
-          <button
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "1rem",
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#1e293b",
+            padding: "1rem",
+            borderRadius: "0.5rem",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div
+            role="button"
+            tabIndex={0}
             onClick={startGame}
-            style={{ padding: '0.5rem 1.25rem', fontSize: '1rem', fontWeight: 'bold', borderRadius: '0.375rem', border: 'none', backgroundColor: '#10b981', color: '#ffffff', cursor: 'pointer' }}
+            style={{
+              padding: "0.5rem 1.25rem",
+              fontSize: "1rem",
+              fontWeight: "bold",
+              borderRadius: "0.375rem",
+              backgroundColor: "#10b981",
+              color: "#ffffff",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
           >
-            {gameStarted ? 'Restart' : 'Start Game'}
-          </button>
+            {gameStarted ? "Restart" : "Start Game"}
+          </div>
 
           {gameStarted && (
-            <button
-              onClick={() => setIsPaused((prev) => !prev)}
-              style={{ padding: '0.5rem 1.25rem', fontSize: '1rem', fontWeight: 'bold', borderRadius: '0.375rem', border: 'none', backgroundColor: '#f59e0b', color: '#ffffff', cursor: 'pointer' }}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={togglePause}
+              style={{
+                padding: "0.5rem 1.25rem",
+                fontSize: "1rem",
+                fontWeight: "bold",
+                borderRadius: "0.375rem",
+                backgroundColor: "#f59e0b",
+                color: "#ffffff",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
             >
-              {isPaused ? 'Resume' : 'Pause'}
-            </button>
+              {isPaused ? "Resume" : "Pause"}
+            </div>
           )}
 
           {/* Mode Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#334155', padding: '0.25rem', borderRadius: '0.375rem' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              backgroundColor: "#334155",
+              padding: "0.25rem",
+              borderRadius: "0.375rem",
+            }}
+          >
             <button
-              onClick={() => setMode('user')}
+              onClick={() => setMode("user")}
               style={{
-                padding: '0.375rem 0.75rem',
-                fontSize: '0.875rem',
-                borderRadius: '0.25rem',
-                border: 'none',
-                backgroundColor: mode === 'user' ? '#3b82f6' : 'transparent',
-                color: mode === 'user' ? '#ffffff' : '#94a3b8',
-                cursor: 'pointer',
+                padding: "0.375rem 0.75rem",
+                fontSize: "0.875rem",
+                borderRadius: "0.25rem",
+                border: "none",
+                backgroundColor: mode === "user" ? "#3b82f6" : "transparent",
+                color: mode === "user" ? "#ffffff" : "#94a3b8",
+                cursor: "pointer",
               }}
             >
               User Mode
             </button>
             <button
-              onClick={() => setMode('ai')}
+              onClick={() => setMode("ai")}
               style={{
-                padding: '0.375rem 0.75rem',
-                fontSize: '0.875rem',
-                borderRadius: '0.25rem',
-                border: 'none',
-                backgroundColor: mode === 'ai' ? '#8b5cf6' : 'transparent',
-                color: mode === 'ai' ? '#ffffff' : '#94a3b8',
-                cursor: 'pointer',
+                padding: "0.375rem 0.75rem",
+                fontSize: "0.875rem",
+                borderRadius: "0.25rem",
+                border: "none",
+                backgroundColor: mode === "ai" ? "#8b5cf6" : "transparent",
+                color: mode === "ai" ? "#ffffff" : "#94a3b8",
+                cursor: "pointer",
               }}
             >
               AI Mode
@@ -302,8 +430,10 @@ export default function TetrisGame() {
           </div>
 
           {/* Tick Rate Config */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', color: '#cbd5e1' }}>Speed (ms):</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.875rem", color: "#cbd5e1" }}>
+              Speed (ms):
+            </label>
             <input
               type="number"
               min="50"
@@ -311,25 +441,39 @@ export default function TetrisGame() {
               step="50"
               value={tickRate}
               onChange={(e) => setTickRate(Number(e.target.value))}
-              style={{ width: '70px', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', border: '1px solid #475569', backgroundColor: '#0f172a', color: '#ffffff' }}
+              style={{
+                width: "70px",
+                padding: "0.25rem 0.5rem",
+                borderRadius: "0.25rem",
+                border: "1px solid #475569",
+                backgroundColor: "#0f172a",
+                color: "#ffffff",
+              }}
             />
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "2rem",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
           {/* Tetris Board */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: "relative" }}>
             <div
               style={{
-                display: 'grid',
+                display: "grid",
                 gridTemplateColumns: `repeat(${BOARD_WIDTH}, 28px)`,
                 gridTemplateRows: `repeat(${BOARD_TOTAL_HEIGHT - BOARD_BUFFER_HEIGHT}, 28px)`,
-                gap: '1px',
-                backgroundColor: '#334155',
-                border: '3px solid #475569',
-                borderRadius: '0.25rem',
-                padding: '1px',
+                gap: "1px",
+                backgroundColor: "#334155",
+                border: "3px solid #475569",
+                borderRadius: "0.25rem",
+                padding: "1px",
               }}
             >
               {displayGrid.map((row, rIdx) =>
@@ -337,40 +481,48 @@ export default function TetrisGame() {
                   <div
                     key={`${rIdx}-${cIdx}`}
                     style={{
-                      width: '28px',
-                      height: '28px',
+                      width: "28px",
+                      height: "28px",
                       backgroundColor: COLOR_MAP[cellValue] || COLOR_MAP[0],
-                      borderRadius: '2px',
+                      borderRadius: "2px",
                     }}
                   />
-                ))
+                )),
               )}
             </div>
 
             {gameOver && (
               <div
                 style={{
-                  position: 'absolute',
+                  position: "absolute",
                   inset: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '0.25rem',
+                  backgroundColor: "rgba(0, 0, 0, 0.85)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "0.25rem",
                 }}
               >
-                <h2 style={{ fontSize: '2rem', color: '#ef4444', marginBottom: '1rem' }}>Game Over</h2>
+                <h2
+                  style={{
+                    fontSize: "2rem",
+                    color: "#ef4444",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  Game Over
+                </h2>
                 <button
                   onClick={startGame}
                   style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#3b82f6',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
+                    padding: "0.5rem 1rem",
+                    backgroundColor: "#3b82f6",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold",
+                    cursor: "pointer",
                   }}
                 >
                   Play Again
@@ -380,32 +532,135 @@ export default function TetrisGame() {
           </div>
 
           {/* Stats & Controls Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '220px' }}>
-            <div style={{ backgroundColor: '#1e293b', padding: '1.25rem', borderRadius: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', marginBottom: '0.75rem', color: '#94a3b8' }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.5rem",
+              width: "220px",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#1e293b",
+                padding: "1.25rem",
+                borderRadius: "0.5rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: "bold",
+                  marginBottom: "0.75rem",
+                  color: "#94a3b8",
+                }}
+              >
+                Next Piece
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(4, 28px)`,
+                  gridTemplateRows: `repeat(4, 28px)`,
+                  gap: "1px",
+                  backgroundColor: "#334155",
+                  borderRadius: "0.25rem",
+                  padding: "1px",
+                }}
+              >
+                {Array.from({ length: 4 }).map((_, rIdx) =>
+                  Array.from({ length: 4 }).map((_, cIdx) => {
+                    const cellValue =
+                      nextPiece && nextPiece.shape[rIdx]
+                        ? nextPiece.shape[rIdx][cIdx]
+                        : 0;
+                    return (
+                      <div
+                        key={`${rIdx}-${cIdx}`}
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          backgroundColor: COLOR_MAP[cellValue] || COLOR_MAP[0],
+                          borderRadius: "2px",
+                        }}
+                      />
+                    );
+                  }),
+                )}
+              </div>
+
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: "bold",
+                  marginBottom: "0.75rem",
+                  color: "#94a3b8",
+                }}
+              >
                 Stats
               </h3>
-              <p style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
-                Score: <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{score}</span>
+              <p style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
+                Score:{" "}
+                <span style={{ color: "#38bdf8", fontWeight: "bold" }}>
+                  {score}
+                </span>
               </p>
-              <p style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
-                Lines: <span style={{ color: '#34d399', fontWeight: 'bold' }}>{lines}</span>
+              <p style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
+                Lines:{" "}
+                <span style={{ color: "#34d399", fontWeight: "bold" }}>
+                  {lines}
+                </span>
               </p>
-              <p style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                Mode: <span style={{ color: '#f43f5e', fontWeight: 'bold' }}>{mode.toUpperCase()}</span>
+              <p style={{ fontSize: "0.875rem", color: "#94a3b8" }}>
+                Mode:{" "}
+                <span style={{ color: "#f43f5e", fontWeight: "bold" }}>
+                  {mode.toUpperCase()}
+                </span>
               </p>
             </div>
 
-            <div style={{ backgroundColor: '#1e293b', padding: '1.25rem', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#94a3b8' }}>
+            <div
+              style={{
+                backgroundColor: "#1e293b",
+                padding: "1.25rem",
+                borderRadius: "0.5rem",
+                fontSize: "0.875rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1rem",
+                  fontWeight: "bold",
+                  marginBottom: "0.5rem",
+                  color: "#94a3b8",
+                }}
+              >
                 Controls (User Mode)
               </h3>
-              <ul style={{ paddingLeft: '1.25rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <li><b>Left / A:</b> Move Left</li>
-                <li><b>Right / D:</b> Move Right</li>
-                <li><b>Up / W:</b> Rotate</li>
-                <li><b>Down / S:</b> Soft Drop</li>
-                <li><b>Space:</b> Hard Drop</li>
+              <ul
+                style={{
+                  paddingLeft: "1.25rem",
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                }}
+              >
+                <li>
+                  <b>Left / A:</b> Move Left
+                </li>
+                <li>
+                  <b>Right / D:</b> Move Right
+                </li>
+                <li>
+                  <b>Up / W:</b> Rotate
+                </li>
+                <li>
+                  <b>Down / S:</b> Soft Drop
+                </li>
+                <li>
+                  <b>Space:</b> Hard Drop
+                </li>
               </ul>
             </div>
           </div>

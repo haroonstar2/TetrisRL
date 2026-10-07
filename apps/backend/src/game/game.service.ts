@@ -18,6 +18,8 @@ export interface GameStateDto {
 
 export interface ActionResponseDto {
   action: string;
+  rotation: number;
+  column: number;
 }
 
 @Injectable()
@@ -41,7 +43,7 @@ export class GameService {
         `Failed to reach RL Service at ${rlServiceUrl}: ${error.message}`,
       );
       // Fallback response if RL service is unreachable
-      return { action: "none" };
+      return { action: "none", rotation: 0, column: 0 };
     }
   }
 }

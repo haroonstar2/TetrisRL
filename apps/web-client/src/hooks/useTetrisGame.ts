@@ -39,6 +39,7 @@ export function useTetrisGame() {
   modeRef.current = mode;
   const scoreRef = useRef(score);
   scoreRef.current = score;
+  const aiStepInFlightRef = useRef(false);
 
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
@@ -209,14 +210,20 @@ export function useTetrisGame() {
       !gameStarted ||
       gameOverRef.current ||
       isPaused ||
-      modeRef.current !== "ai"
+      modeRef.current !== "ai" ||
+      aiStepInFlightRef.current
     )
       return;
+
+    const pieceAtRequest = currentPieceRef.current;
+    if (!pieceAtRequest) return;
+
+    aiStepInFlightRef.current = true;
 
     try {
       const payload = {
         grid: gridRef.current,
-        currentPiece: currentPieceRef.current,
+        currentPiece: pieceAtRequest,
         score: scoreRef.current,
         gameOver: gameOverRef.current,
       };
@@ -227,30 +234,96 @@ export function useTetrisGame() {
         body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        switch (data.action) {
-          case "left":
-            movePiece(-1, 0);
-            break;
-          case "right":
-            movePiece(1, 0);
-            break;
-          case "rotate":
-            rotatePiece();
-            break;
-          case "drop":
-            dropPiece();
-            break;
-          default:
-            dropPiece();
-            break;
-        }
-      } else {
+      // if (response.ok) {
+      //   const data = await response.json();
+      //   switch (data.action) {
+      //     case "left":
+      //       movePiece(-1, 0);
+      //       break;
+      //     case "right":
+      //       movePiece(1, 0);
+      //       break;
+      //     case "rotate":
+      //       rotatePiece();
+      //       break;
+      //     case "drop":
+      //       dropPiece();
+      //       break;
+      //     default:
+      //       dropPiece();
+      //       break;
+      //   }
+      // } else {
+      //   dropPiece();
+      // }
+
+      if (!response.ok) {
         dropPiece();
+        return;
       }
+
+      const data = await response.json();
+      if (
+        data.action !== "drop" ||
+        !Number.isInteger(data.rotation) ||
+        !Number.isInteger(data.column)
+      ) {
+        dropPiece();
+        return;
+      }
+
+      const rotation = ((data.rotation % 4) + 4) % 4;
+      const column = data.column;
+
+      // Rotate the shape matrix
+      if (currentPieceRef.current !== pieceAtRequest) {
+        return;
+      }
+
+      let targetShape: number[][] = pieceAtRequest.shape;
+      for (let i = 0; i < rotation; i++) {
+        targetShape = rotateMatrix(targetShape);
+      }
+
+      const snappedPiece: Piece = {
+        ...pieceAtRequest,
+        shape: targetShape,
+        x: column,
+      };
+
+      if (checkCollision(gridRef.current, snappedPiece, 0, 0)) {
+        setGameOver(true);
+        return;
+      }
+
+      // Find where to place the snapped piece on the grid before dropping it
+      let dy = 0;
+
+      while (!checkCollision(gridRef.current, snappedPiece, 0, dy + 1)) {
+        dy++;
+      }
+
+      const droppedPiece: Piece = {
+        ...snappedPiece,
+        y: snappedPiece.y + dy,
+      };
+
+      // Merge the dropped piece into the grid and clear any completed lines
+      const merged = mergePieceToGrid(gridRef.current, droppedPiece);
+      const { newGrid, linesCleared } = clearLines(merged);
+
+      setGrid(newGrid);
+
+      if (linesCleared > 0) {
+        setLines((prev) => prev + linesCleared);
+        setScore((prev) => prev + calculateScore(linesCleared));
+      }
+
+      spawnPiece(newGrid);
     } catch (err) {
       dropPiece();
+    } finally {
+      aiStepInFlightRef.current = false;
     }
   }, [backendUrl, gameStarted, isPaused, movePiece, rotatePiece, dropPiece]);
 

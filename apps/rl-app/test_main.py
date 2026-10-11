@@ -17,6 +17,12 @@ def test_get_action():
             "y": 0,
             "type": "O"
         },
+        "nextPiece": {
+            "shape": [[0, 1, 0], [1, 1, 1], [0, 0, 0]],
+            "x": 3,
+            "y": 0,
+            "type": "T"
+        },
         "score": 0,
         "gameOver": False
     }

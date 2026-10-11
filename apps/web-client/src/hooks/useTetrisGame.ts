@@ -224,6 +224,7 @@ export function useTetrisGame() {
       const payload = {
         grid: gridRef.current,
         currentPiece: pieceAtRequest,
+        nextPiece: nextPieceRef.current,
         score: scoreRef.current,
         gameOver: gameOverRef.current,
       };

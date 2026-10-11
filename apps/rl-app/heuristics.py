@@ -1,4 +1,9 @@
-def evaluate_board(board: list[list[int]]) -> float:
+"""
+Heuristic evaluation functions for the Tetris RL agent.
+Includes board evaluation, piece rotation, and drop simulation.
+
+"""
+def evaluate_board(board: list[list[int]], lines_cleared: int = 0) -> float:
     """
     Computes a heuristic score based on aggregate height, lines, holes, and bumpiness.
     Formula reference from Stevens & Pradhan / Yiyuan.
@@ -29,10 +34,7 @@ def evaluate_board(board: list[list[int]]) -> float:
                 
     bumpiness = sum(abs(heights[i] - heights[i+1]) for i in range(len(heights) - 1))
 
-    complete_lines = sum(1 for r in range(num_rows) if all(board[r][c] != 0 for c in range(num_cols)))
-    
-    # Weighted fitness score. Weights taken from Yiyuan.
-    score = (-0.51 * aggregate_height) + (0.76 * complete_lines) + (-0.36 * holes) + (-0.18 * bumpiness)
+    score = (-0.51 * aggregate_height) + (0.76 * lines_cleared) + (-0.36 * holes) + (-0.18 * bumpiness)
     return score
 
 def rotate_matrix(matrix: list[list[int]]) -> list[list[int]]:

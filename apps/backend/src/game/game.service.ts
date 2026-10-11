@@ -12,6 +12,7 @@ export interface CurrentPieceDto {
 export interface GameStateDto {
   grid: number[][];
   currentPiece?: CurrentPieceDto | null;
+  nextPiece?: CurrentPieceDto | null;
   score: number;
   gameOver: boolean;
 }
